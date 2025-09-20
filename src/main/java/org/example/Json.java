@@ -1,11 +1,8 @@
 package org.example;
 
-
 import com.google.gson.*;
-import com.google.gson.reflect.TypeToken;
 import java.lang.reflect.Type;
 import java.time.Instant;
-
 
 public final class Json {
     public static final Gson gson = new GsonBuilder()
@@ -19,9 +16,8 @@ public final class Json {
                     return Instant.parse(json.getAsString());
                 }
             })
-            .setPrettyPrinting()
+            // مهم: prettyPrinting حذف شد تا همه‌ی پیام‌ها تک‌خط باشند
             .create();
-
 
     private Json() {}
 }

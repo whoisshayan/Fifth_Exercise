@@ -35,31 +35,68 @@ public class ClientApp {
 
 
             System.out.println(help());
+
             System.out.print("> ");
             while (sc.hasNextLine()) {
                 String line = sc.nextLine().trim();
-                if(line.isEmpty()) { System.out.print("> "); continue; }
-                if(line.equals("exit")) break;
+                if (line.isEmpty()) { System.out.print("> "); continue; }
+                if (line.equals("exit")) break;
 
-
+                // تبدیل دستور متنی به درخواست JSON
                 Protocol.Request req = parseCommand(line, token, udp);
-                if(req == null){ System.out.print("> "); continue; }
+                if (req == null) { System.out.print("> "); continue; }
 
+                // ارسال به سرور (هر پیام یک خط JSON)
+                out.write(org.example.Json.gson.toJson(req));
+                out.write("\n");
+                out.flush();
 
-                out.write(Json.gson.toJson(req)); out.write("\n"); out.flush();
+                // دریافت پاسخ (هر پاسخ یک خط)
                 String respLine = in.readLine();
-                Protocol.Response resp = Json.gson.fromJson(respLine, Protocol.Response.class);
-                if(!resp.ok){ System.out.println("Error: "+resp.error); }
-                else { System.out.println(Json.gson.toJson(resp.data));
-// capture token upon login/register
-                    if(req.cmd.equals("login") || req.cmd.equals("register")){
-                        Map<?,?> m = (Map<?,?>) resp.data;
-                        token = (String) m.get("token");
-                        System.out.println("[info] token set");
+
+                // --- محافظت در برابر پاسخ غیر JSON یا قطع ارتباط ---
+                if (respLine == null) {
+                    System.out.println("Disconnected from server.");
+                    break;
+                }
+                String trimmed = respLine.trim();
+                if (!trimmed.startsWith("{")) {
+                    // سرور باید آبجکت JSON بفرستد؛ اگر چیز دیگری بود، نمایش بده و ادامه
+                    System.out.println("Non-JSON from server: " + respLine);
+                    System.out.print("> ");
+                    continue;
+                }
+                // -----------------------------------------------------
+
+                // پارس امن پاسخ
+                Protocol.Response resp;
+                try {
+                    resp = org.example.Json.gson.fromJson(respLine, Protocol.Response.class);
+                } catch (Exception ex) {
+                    System.out.println("Bad JSON from server: " + respLine);
+                    System.out.print("> ");
+                    continue;
+                }
+
+                // پردازش پاسخ
+                if (!resp.ok) {
+                    System.out.println("Error: " + resp.error);
+                } else {
+                    System.out.println(org.example.Json.gson.toJson(resp.data));
+                    // ست کردن توکن بعد از ثبت‌نام/ورود
+                    if ("login".equals(req.cmd) || "register".equals(req.cmd)) {
+                        @SuppressWarnings("unchecked")
+                        java.util.Map<String,Object> m = (java.util.Map<String,Object>) resp.data;
+                        Object tok = m.get("token");
+                        if (tok != null) {
+                            token = tok.toString();
+                            System.out.println("[info] token set");
+                        }
                     }
                 }
                 System.out.print("> ");
             }
+
             udp.close();
         }
     }
